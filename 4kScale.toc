@@ -1,0 +1,12 @@
+## Interface: 120001
+## Title: |cFF00CCFF4k|rScale
+## Notes: Pixel-perfect UI scaling for 4K and ultrawide monitors
+## Author: Nenad
+## Version: 1.0.0
+## SavedVariables: FourKScaleDB
+## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
+## AddonCompartmentFunc: FourKScale_OnAddonCompartmentClick
+## AddonCompartmentFuncOnEnter: FourKScale_OnAddonCompartmentEnter
+## AddonCompartmentFuncOnLeave: FourKScale_OnAddonCompartmentLeave
+
+4kScale.lua
