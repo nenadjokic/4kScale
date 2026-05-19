@@ -1,8 +1,8 @@
-## Interface: 120001
+## Interface: 120001, 120005, 120007
 ## Title: |cFF00CCFF4k|rScale
-## Notes: Pixel-perfect UI scaling for 4K and ultrawide monitors
+## Notes: Pixel-perfect UI scaling for 4K and ultrawide monitors, plus Edit Mode position helper
 ## Author: Nenad
-## Version: 1.0.0
+## Version: 1.1.0
 ## SavedVariables: FourKScaleDB
 ## IconTexture: Interface\Icons\INV_Misc_Spyglass_03
 ## AddonCompartmentFunc: FourKScale_OnAddonCompartmentClick

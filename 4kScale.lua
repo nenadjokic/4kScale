@@ -1028,6 +1028,290 @@ function FourKScale_OnAddonCompartmentLeave()
 end
 
 -- ============================================================
+-- EDIT MODE POSITION HELPER (v1.1.0)
+-- ============================================================
+-- Companion to Blizzard's Edit Mode. Snap zones drift at low UI
+-- scale; this gives pixel-precise X/Y control on the selected
+-- system, sidestepping snap entirely.
+
+local emHelper                  -- the floating helper panel
+local selectedSystem            -- currently selected EditMode system (a frame)
+local emHooksInstalled = false
+
+local function GetSystemXY(system)
+    if not system or not system.GetPoint then return 0, 0 end
+    local point, _, _, x, y = system:GetPoint(1)
+    if not point then return 0, 0 end
+    return x or 0, y or 0
+end
+
+local function SetSystemXY(system, newX, newY)
+    if not system or InCombatLockdown() then return false end
+    local point, relativeTo, relativePoint = system:GetPoint(1)
+    if not point then return false end
+    system:ClearAllPoints()
+    system:SetPoint(point, relativeTo or UIParent, relativePoint or point, newX, newY)
+    -- Tell EditMode the position changed so it persists with the layout
+    if system.OnSystemPositionChange then
+        pcall(system.OnSystemPositionChange, system)
+    end
+    if EditModeManagerFrame and EditModeManagerFrame.GetActiveLayoutInfo and EditModeManagerFrame.UpdateLayoutInfo then
+        local layoutInfo = EditModeManagerFrame:GetActiveLayoutInfo()
+        if layoutInfo then
+            pcall(EditModeManagerFrame.UpdateLayoutInfo, EditModeManagerFrame, layoutInfo)
+        end
+    end
+    return true
+end
+
+local function NudgeBy(dx, dy)
+    if not selectedSystem then return end
+    local x, y = GetSystemXY(selectedSystem)
+    SetSystemXY(selectedSystem, x + dx, y + dy)
+    if emHelper then emHelper:Refresh() end
+end
+
+local function CenterH()
+    if not selectedSystem then return end
+    local _, y = GetSystemXY(selectedSystem)
+    SetSystemXY(selectedSystem, 0, y)
+    if emHelper then emHelper:Refresh() end
+end
+
+local function CenterV()
+    if not selectedSystem then return end
+    local x = GetSystemXY(selectedSystem)
+    SetSystemXY(selectedSystem, x, 0)
+    if emHelper then emHelper:Refresh() end
+end
+
+local function MakeEmBtn(parent, w, h, label, lblColor)
+    local b = MakeFlatBtn(parent, w, h, 0.07, 0.08, 0.12, 0.12, 0.14, 0.20)
+    local lbl = b:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    lbl:SetPoint("CENTER")
+    lbl:SetText(label)
+    local lr, lg, lb = 0.62, 0.67, 0.76
+    if lblColor then lr, lg, lb = lblColor[1], lblColor[2], lblColor[3] end
+    lbl:SetTextColor(lr, lg, lb)
+    b:SetScript("OnEnter", function(s)
+        s:SetBackdropColor(0.10, 0.12, 0.18, 1.0)
+        s:SetBackdropBorderColor(0.18, 0.22, 0.34, 1.0)
+        lbl:SetTextColor(0.92, 0.96, 1.0)
+    end)
+    b:SetScript("OnLeave", function(s)
+        s:SetBackdropColor(0.07, 0.08, 0.12, 1.0)
+        s:SetBackdropBorderColor(0.12, 0.14, 0.20, 1.0)
+        lbl:SetTextColor(lr, lg, lb)
+    end)
+    return b
+end
+
+local function CreateEditModeHelper()
+    if emHelper then return emHelper end
+
+    local PW, PH = 290, 190
+    local HH = 30
+    local PAD = 12
+    local CR, CG, CB = 0.0, 0.80, 1.0
+
+    local f = CreateFrame("Frame", "FourKScaleEditHelper", UIParent, "BackdropTemplate")
+    f:SetSize(PW, PH)
+    f:SetPoint("BOTTOMRIGHT", -60, 200)
+    f:SetFrameStrata("DIALOG")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    f:SetClampedToScreen(true)
+    f:SetBackdrop({
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    f:SetBackdropColor(0.052, 0.056, 0.088, 0.97)
+    f:SetBackdropBorderColor(0.09, 0.10, 0.15, 1.0)
+
+    -- Header
+    local hdr = CreateFrame("Frame", nil, f, "BackdropTemplate")
+    hdr:SetSize(PW - 2, HH)
+    hdr:SetPoint("TOPLEFT", 1, -1)
+    hdr:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        tile = true, tileSize = 16,
+        insets = { left = 0, right = 0, top = 0, bottom = 0 },
+    })
+    hdr:SetBackdropColor(0.030, 0.034, 0.060, 1.0)
+
+    local stripe = hdr:CreateTexture(nil, "OVERLAY")
+    stripe:SetSize(3, HH)
+    stripe:SetPoint("TOPLEFT", 0, 0)
+    stripe:SetColorTexture(CR, CG, CB, 1.0)
+
+    local hdrSep = hdr:CreateTexture(nil, "OVERLAY")
+    hdrSep:SetHeight(1)
+    hdrSep:SetPoint("BOTTOMLEFT", 0, 0)
+    hdrSep:SetPoint("BOTTOMRIGHT", 0, 0)
+    hdrSep:SetColorTexture(CR, CG, CB, 0.28)
+
+    local titleTxt = hdr:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    titleTxt:SetPoint("LEFT", 12, 0)
+    titleTxt:SetText("|cFF00CCFF4kScale|r |cFF888888Position Helper|r")
+
+    local closeBtn = CreateFrame("Button", nil, hdr)
+    closeBtn:SetSize(22, 22)
+    closeBtn:SetPoint("RIGHT", -6, 0)
+    local closeTxt = closeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    closeTxt:SetPoint("CENTER")
+    closeTxt:SetText("|cFF555566x|r")
+    closeBtn:SetScript("OnClick", function() f:Hide() end)
+    closeBtn:SetScript("OnEnter", function() closeTxt:SetText("|cFFFF5566x|r") end)
+    closeBtn:SetScript("OnLeave", function() closeTxt:SetText("|cFF555566x|r") end)
+
+    -- Selected frame name (or hint when nothing selected)
+    local nameLbl = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    nameLbl:SetPoint("TOPLEFT", PAD, -(HH + 8))
+    nameLbl:SetPoint("TOPRIGHT", -PAD, -(HH + 8))
+    nameLbl:SetJustifyH("LEFT")
+    nameLbl:SetWordWrap(false)
+    f.nameLbl = nameLbl
+
+    -- Row layout
+    local ROW1_Y = -(HH + 30)   -- X row
+    local ROW2_Y = -(HH + 56)   -- Y row
+
+    local xLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    xLbl:SetPoint("TOPLEFT", PAD, ROW1_Y)
+    xLbl:SetText("X:")
+    xLbl:SetTextColor(0.76, 0.78, 0.82)
+
+    local xInput = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+    xInput:SetSize(56, 20)
+    xInput:SetPoint("LEFT", xLbl, "RIGHT", 6, 0)
+    xInput:SetAutoFocus(false)
+    xInput:SetMaxLetters(7)
+    xInput:SetJustifyH("CENTER")
+    f.xInput = xInput
+
+    local yLbl = f:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    yLbl:SetPoint("TOPLEFT", PAD, ROW2_Y)
+    yLbl:SetText("Y:")
+    yLbl:SetTextColor(0.76, 0.78, 0.82)
+
+    local yInput = CreateFrame("EditBox", nil, f, "InputBoxTemplate")
+    yInput:SetSize(56, 20)
+    yInput:SetPoint("LEFT", yLbl, "RIGHT", 6, 0)
+    yInput:SetAutoFocus(false)
+    yInput:SetMaxLetters(7)
+    yInput:SetJustifyH("CENTER")
+    f.yInput = yInput
+
+    local function ApplyFromInputs()
+        if not selectedSystem then return end
+        local x = tonumber(xInput:GetText())
+        local y = tonumber(yInput:GetText())
+        if x and y then
+            SetSystemXY(selectedSystem, x, y)
+            f:Refresh()
+        end
+    end
+
+    xInput:SetScript("OnEnterPressed", function(self) ApplyFromInputs(); self:ClearFocus() end)
+    xInput:SetScript("OnEscapePressed", function(self) self:ClearFocus(); f:Refresh() end)
+    yInput:SetScript("OnEnterPressed", function(self) ApplyFromInputs(); self:ClearFocus() end)
+    yInput:SetScript("OnEscapePressed", function(self) self:ClearFocus(); f:Refresh() end)
+
+    -- Nudge buttons (-10, -1, +1, +10) for X and Y
+    local nudgeW, nudgeH, nudgeGap = 28, 20, 3
+
+    local function PlaceNudgeRow(anchorTo, dxAxis, dyAxis)
+        local prev = anchorTo
+        local nudges = { -10, -1, 1, 10 }
+        for i, n in ipairs(nudges) do
+            local label = (n > 0 and "+" or "") .. tostring(n)
+            -- positive accent color for + and muted for -
+            local color = n > 0 and { 0.55, 0.78, 0.55 } or { 0.78, 0.55, 0.55 }
+            local b = MakeEmBtn(f, nudgeW, nudgeH, label, color)
+            if prev == anchorTo then
+                b:SetPoint("LEFT", prev, "RIGHT", 12, 0)
+            else
+                b:SetPoint("LEFT", prev, "RIGHT", nudgeGap, 0)
+            end
+            b:SetScript("OnClick", function() NudgeBy(n * dxAxis, n * dyAxis) end)
+            prev = b
+        end
+    end
+
+    PlaceNudgeRow(xInput, 1, 0)
+    PlaceNudgeRow(yInput, 0, 1)
+
+    -- Center H / Center V row
+    local cBtnY = 14
+    local cBtnW = math.floor((PW - PAD * 2 - 6) / 2)
+
+    local centerH = MakeEmBtn(f, cBtnW, 22, "Center H", { 0.5, 0.7, 0.85 })
+    centerH:SetPoint("BOTTOMLEFT", PAD, cBtnY)
+    centerH:SetScript("OnClick", CenterH)
+
+    local centerV = MakeEmBtn(f, cBtnW, 22, "Center V", { 0.5, 0.7, 0.85 })
+    centerV:SetPoint("BOTTOMLEFT", PAD + cBtnW + 6, cBtnY)
+    centerV:SetScript("OnClick", CenterV)
+
+    -- Refresh from selectedSystem
+    function f:Refresh()
+        if selectedSystem then
+            local x, y = GetSystemXY(selectedSystem)
+            xInput:SetText(string.format("%d", math.floor(x + 0.5)))
+            yInput:SetText(string.format("%d", math.floor(y + 0.5)))
+            local name = selectedSystem.systemNameString
+                      or (selectedSystem.GetName and selectedSystem:GetName())
+                      or "Frame"
+            nameLbl:SetText("|cFF00CCFFSelected:|r |cFFFFFFFF" .. name .. "|r")
+        else
+            xInput:SetText("")
+            yInput:SetText("")
+            nameLbl:SetText("|cFF888888Click any Edit Mode frame to select|r")
+        end
+    end
+
+    f:Hide()
+    emHelper = f
+    return f
+end
+
+local function SetupEditModeHooks()
+    if emHooksInstalled then return true end
+    if not EditModeManagerFrame then return false end
+
+    if EditModeManagerFrame.SelectSystem then
+        hooksecurefunc(EditModeManagerFrame, "SelectSystem", function(_, system)
+            selectedSystem = system
+            if emHelper and emHelper:IsShown() then emHelper:Refresh() end
+        end)
+    end
+    if EditModeManagerFrame.ClearSelectedSystem then
+        hooksecurefunc(EditModeManagerFrame, "ClearSelectedSystem", function()
+            selectedSystem = nil
+            if emHelper and emHelper:IsShown() then emHelper:Refresh() end
+        end)
+    end
+
+    EditModeManagerFrame:HookScript("OnShow", function()
+        local h = CreateEditModeHelper()
+        h:Show()
+        h:Refresh()
+    end)
+    EditModeManagerFrame:HookScript("OnHide", function()
+        if emHelper then emHelper:Hide() end
+        selectedSystem = nil
+    end)
+
+    emHooksInstalled = true
+    return true
+end
+
+-- ============================================================
 -- SLASH COMMANDS
 -- ============================================================
 
@@ -1092,6 +1376,22 @@ SlashCmdList["FOURKSCALE"] = function(msg)
         return
     end
 
+    if msg == "edit" or msg == "editmode" then
+        if InCombatLockdown() then
+            print(PREFIX .. "Cannot open Edit Mode in combat.")
+            return
+        end
+        if C_AddOns and C_AddOns.IsAddOnLoaded and not C_AddOns.IsAddOnLoaded("Blizzard_EditMode") then
+            UIParentLoadAddOn("Blizzard_EditMode")
+        end
+        if not EditModeManagerFrame then
+            print(PREFIX .. "Edit Mode not available on this client.")
+            return
+        end
+        ShowUIPanel(EditModeManagerFrame)
+        return
+    end
+
     local val = tonumber(msg)
     if val then
         local applied, key = SaveAndApply(val)
@@ -1105,6 +1405,7 @@ SlashCmdList["FOURKSCALE"] = function(msg)
     print("  |cFFFFFFFF/4kuhd auto|r - Apply recommended scale")
     print("  |cFFFFFFFF/4kuhd reset|r - Reset to default (1.0)")
     print("  |cFFFFFFFF/4kuhd info|r - Show resolution & scale info")
+    print("  |cFFFFFFFF/4kuhd edit|r - Open Edit Mode + Position Helper")
     print("  |cFFFFFFFF/4kuhd minimap|r / |cFFFFFFFF minimap hide|r")
 end
 
@@ -1122,14 +1423,19 @@ eventFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
 local loginApplied = false
 
 eventFrame:SetScript("OnEvent", function(self, event, arg1)
-    if event == "ADDON_LOADED" and arg1 == ADDON_NAME then
-        GetDB()
-        CreateMinimapButton()
-        RestoreMinimapPosition()
-        if db.minimapHidden then
-            mmBtn:Hide()
+    if event == "ADDON_LOADED" then
+        if arg1 == ADDON_NAME then
+            GetDB()
+            CreateMinimapButton()
+            RestoreMinimapPosition()
+            if db.minimapHidden then
+                mmBtn:Hide()
+            end
+            -- Try Edit Mode hooks now; will retry on Blizzard_EditMode load if not ready
+            if EditModeManagerFrame then SetupEditModeHooks() end
+        elseif arg1 == "Blizzard_EditMode" then
+            SetupEditModeHooks()
         end
-        self:UnregisterEvent("ADDON_LOADED")
 
     elseif event == "PLAYER_LOGIN" then
         if db.autoApply then

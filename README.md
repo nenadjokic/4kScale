@@ -3,7 +3,7 @@
 Pixel-perfect UI scaling for World of Warcraft on 4K, ultrawide, and Retina displays.
 
 ![WoW](https://img.shields.io/badge/WoW-Midnight%2012.x-blueviolet)
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.1.0-blue)
 
 ## The Problem
 
@@ -26,6 +26,7 @@ WoW's built-in UI scale slider maxes out around 0.64, which is too large for hig
 - **Slash commands** — full control from the chat box
 - **Custom minimap button** — draggable, with tooltip showing current scale info
 - **Premium UI** — custom toggle switches, cyan accent design, visual scale bar
+- **Edit Mode Position Helper** — at low UI scale, Blizzard's snap zones drift and centering frames becomes painful. The helper appears alongside Edit Mode and gives you direct pixel-precise X/Y control on the selected frame: type exact coordinates, nudge ±1 / ±10, or center on either axis
 
 ## Slash Commands
 
@@ -36,6 +37,7 @@ WoW's built-in UI scale slider maxes out around 0.64, which is too large for hig
 | `/4kuhd auto` | Apply recommended scale for your display |
 | `/4kuhd reset` | Reset scale to 1.0 |
 | `/4kuhd info` | Show resolution, scale, and recommendation |
+| `/4kuhd edit` | Open Edit Mode together with the Position Helper |
 | `/4kuhd minimap` | Show minimap button |
 | `/4kuhd minimap hide` | Hide minimap button |
 
