@@ -57,7 +57,7 @@ WoW's built-in UI scale slider maxes out around 0.64, which is too large for hig
 ## Installation
 
 1. Download the latest release from [GitHub Releases](../../releases) or [CurseForge](https://www.curseforge.com/wow/addons/4kscale)
-2. Extract `4kScale` folder into `World of Warcraft/_retail_/Interface/AddOns/`
+2. Extract `4kScale` folder into `World of Warcraft/_retail_/Interface/AddOns/` (retail) or `World of Warcraft/_forever_/Interface/AddOns/` (WoW Forever)
 3. Restart WoW or `/reload`
 4. Click the minimap button or type `/4kuhd`
 

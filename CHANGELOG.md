@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.2.0 (2026-11-06)
+
+### New
+- **WoW Forever support.** The addon now loads on the Forever client (Interface 16001, build 1.60.1). Scaling, presets, the options panel and the minimap button work the same as on retail.
+
+### Fixes
+- `/4kuhd edit` no longer depends on `C_AddOns`: it falls back to the global `IsAddOnLoaded` and loads `Blizzard_EditMode` under `pcall`, and still reports when a client has no Edit Mode.
+
 ## v1.1.0 (2026-05-19)
 
 ### New feature

@@ -1381,8 +1381,11 @@ SlashCmdList["FOURKSCALE"] = function(msg)
             print(PREFIX .. "Cannot open Edit Mode in combat.")
             return
         end
-        if C_AddOns and C_AddOns.IsAddOnLoaded and not C_AddOns.IsAddOnLoaded("Blizzard_EditMode") then
-            UIParentLoadAddOn("Blizzard_EditMode")
+        -- Classic-based clients (WoW Forever, Interface 16001) may only have the old global
+        -- IsAddOnLoaded, and may not ship Blizzard_EditMode at all, so load it under pcall.
+        local isLoaded = (C_AddOns and C_AddOns.IsAddOnLoaded) or IsAddOnLoaded
+        if isLoaded and not isLoaded("Blizzard_EditMode") and UIParentLoadAddOn then
+            pcall(UIParentLoadAddOn, "Blizzard_EditMode")
         end
         if not EditModeManagerFrame then
             print(PREFIX .. "Edit Mode not available on this client.")
